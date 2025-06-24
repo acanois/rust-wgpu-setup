@@ -1,5 +1,6 @@
 pub mod app;
 pub mod state;
+pub mod vertex;
 
 use winit::event_loop::EventLoop;
 

@@ -2,6 +2,25 @@ use std::sync::Arc;
 
 use winit::{event_loop::ActiveEventLoop, keyboard::KeyCode, window::Window};
 
+use wgpu::util::DeviceExt;
+
+use crate::vertex::Vertex;
+
+const VERTICES: &[Vertex] = &[
+    Vertex {
+        position: [0.0, 0.5, 0.0],
+        color: [1.0, 0.0, 0.0],
+    },
+    Vertex {
+        position: [-0.5, -0.5, 0.0],
+        color: [0.0, 1.0, 0.0],
+    },
+    Vertex {
+        position: [0.5, -0.5, 0.0],
+        color: [0.0, 0.0, 1.0],
+    },
+];
+
 pub struct State {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
@@ -10,6 +29,8 @@ pub struct State {
     is_surface_configured: bool,
     pub window: Arc<Window>,
     render_pipeline: wgpu::RenderPipeline,
+    vertex_buffer: wgpu::Buffer,
+    num_vertices: u32,
 }
 
 impl State {
@@ -100,7 +121,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"), // vs_main = entry point inside shader.wgsl
-                buffers: &[],                 // buffers to pass to v-shader
+                buffers: &[Vertex::desc()],   // buffers to pass to v-shader
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -137,6 +158,15 @@ impl State {
             cache: None,     // Cache shader compilations. Only useful for android?
         });
 
+        // Vertex
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(VERTICES),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        let num_vertices = VERTICES.len() as u32;
+
         Ok(Self {
             surface,
             device,
@@ -145,6 +175,8 @@ impl State {
             is_surface_configured: false,
             render_pipeline,
             window,
+            vertex_buffer,
+            num_vertices,
         })
     }
 
@@ -208,7 +240,8 @@ impl State {
                 timestamp_writes: None,
             });
             render_pass.set_pipeline(&self.render_pipeline); // 2.
-            render_pass.draw(0..3, 0..1); // 3.
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..)); // 3.
+            render_pass.draw(0..self.num_vertices, 0..1); // 4.
         }
 
         // submit will accept anything that implements IntoIter
