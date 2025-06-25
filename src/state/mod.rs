@@ -4,31 +4,31 @@ use winit::{event_loop::ActiveEventLoop, keyboard::KeyCode, window::Window};
 
 use wgpu::util::DeviceExt;
 
+use crate::camera;
 use crate::texture;
-use crate::vertex::Vertex;
+use crate::vertex;
 
-const VERTICES: &[Vertex] = &[
-    // Changed
-    Vertex {
+const VERTICES: &[vertex::Vertex] = &[
+    vertex::Vertex {
         position: [-0.0868241, 0.49240386, 0.0],
         tex_coords: [0.4131759, 0.00759614],
-    }, // A
-    Vertex {
+    },
+    vertex::Vertex {
         position: [-0.49513406, 0.06958647, 0.0],
         tex_coords: [0.0048659444, 0.43041354],
-    }, // B
-    Vertex {
+    },
+    vertex::Vertex {
         position: [-0.21918549, -0.44939706, 0.0],
         tex_coords: [0.28081453, 0.949397],
-    }, // C
-    Vertex {
+    },
+    vertex::Vertex {
         position: [0.35966998, -0.3473291, 0.0],
         tex_coords: [0.85967, 0.84732914],
-    }, // D
-    Vertex {
+    },
+    vertex::Vertex {
         position: [0.44147372, 0.2347359, 0.0],
         tex_coords: [0.9414737, 0.2652641],
-    }, // E
+    },
 ];
 
 const INDICES: &[u16] = &[0, 1, 4, 1, 2, 4, 2, 3, 4];
@@ -46,16 +46,16 @@ pub struct State {
     num_indices: u32,
     diffuse_texture: texture::Texture,
     diffuse_bind_group: wgpu::BindGroup,
+    camera: camera::Camera,
+    camera_uniform: camera::CameraUniform,
+    camera_buffer: wgpu::Buffer,
+    camera_bind_group: wgpu::BindGroup,
 }
 
 impl State {
-    // We don't need this to be async right now,
-    // but we will in the next tutorial
     pub async fn new(window: Arc<Window>) -> anyhow::Result<Self> {
         let size = window.inner_size();
 
-        // The instance is a handle to our GPU
-        // BackendBit::PRIMARY => Vulkan + Metal + DX12 + Browser WebGPU
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             #[cfg(not(target_arch = "wasm32"))]
             backends: wgpu::Backends::PRIMARY,
@@ -64,7 +64,6 @@ impl State {
             ..Default::default()
         });
 
-        // This what you draw to
         let surface = instance.create_surface(window.clone()).unwrap();
 
         let adapter = instance
@@ -160,6 +159,53 @@ impl State {
             label: Some("diffuse_bind_group"),
         });
 
+        let camera = camera::Camera {
+            // position the camera 1 unit up and 2 units back
+            // +z is out of the screen
+            eye: (0.0, 1.0, 2.0).into(),
+            // have it look at the origin
+            target: (0.0, 0.0, 0.0).into(),
+            // which way is "up"
+            up: cgmath::Vector3::unit_y(),
+            aspect: config.width as f32 / config.height as f32,
+            fovy: 45.0,
+            znear: 0.1,
+            zfar: 100.0,
+        };
+
+        let mut camera_uniform = camera::CameraUniform::new();
+        camera_uniform.update_view_proj(&camera);
+
+        let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Camera Buffer"),
+            contents: bytemuck::cast_slice(&[camera_uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let camera_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+                label: Some("camera_bind_group_layout"),
+            });
+
+        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &camera_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: camera_buffer.as_entire_binding(),
+            }],
+            label: Some("camera_bind_group"),
+        });
+
         // Shader
         // Create shader - include_wgsl! is shorthand for:
         // let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -173,7 +219,7 @@ impl State {
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[&texture_bind_group_layout],
+                bind_group_layouts: &[&texture_bind_group_layout, &camera_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -184,7 +230,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"), // vs_main = entry point inside shader.wgsl
-                buffers: &[Vertex::desc()],   // buffers to pass to v-shader
+                buffers: &[vertex::Vertex::desc()], // buffers to pass to v-shader
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -251,6 +297,10 @@ impl State {
             diffuse_texture,
             diffuse_bind_group,
             window,
+            camera,
+            camera_uniform,
+            camera_buffer,
+            camera_bind_group,
         })
     }
 
@@ -317,13 +367,12 @@ impl State {
             // Set pipeline
             render_pass.set_pipeline(&self.render_pipeline);
 
-            // Set bind group
+            // Set bind groups
             render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
+            render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
 
-            // Set vertex buffer
+            // Set vertex buffer and index buffer
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-
-            // Set index buffer
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
             // Draw indices
