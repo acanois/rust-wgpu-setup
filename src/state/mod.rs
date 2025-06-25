@@ -115,9 +115,9 @@ impl State {
         };
 
         // Texture
-        let diffuse_bytes = include_bytes!("happy-tree.png");
+        let diffuse_bytes = include_bytes!("wood.png");
         let diffuse_texture =
-            texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png").unwrap();
+            texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "wood.png").unwrap();
 
         // This gets added to render pipeline layout in bind_group_layouts
         let texture_bind_group_layout =
