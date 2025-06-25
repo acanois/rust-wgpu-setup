@@ -47,6 +47,7 @@ pub struct State {
     diffuse_texture: texture::Texture,
     diffuse_bind_group: wgpu::BindGroup,
     camera: camera::Camera,
+    camera_controller: camera::CameraController,
     camera_uniform: camera::CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
@@ -159,6 +160,7 @@ impl State {
             label: Some("diffuse_bind_group"),
         });
 
+        // Camera
         let camera = camera::Camera {
             // position the camera 1 unit up and 2 units back
             // +z is out of the screen
@@ -205,6 +207,8 @@ impl State {
             }],
             label: Some("camera_bind_group"),
         });
+
+        let camera_controller = camera::CameraController::new(0.2);
 
         // Shader
         // Create shader - include_wgsl! is shorthand for:
@@ -301,7 +305,12 @@ impl State {
             camera_uniform,
             camera_buffer,
             camera_bind_group,
+            camera_controller,
         })
+    }
+
+    pub fn window(&self) -> &Window {
+        &self.window
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -310,18 +319,29 @@ impl State {
             self.config.height = height;
             self.surface.configure(&self.device, &self.config);
             self.is_surface_configured = true;
+
+             self.camera.aspect = self.config.width as f32 / self.config.height as f32;
         }
     }
 
     // impl State
-    pub fn handle_key(&self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bool) {
-        match (code, is_pressed) {
-            (KeyCode::Escape, true) => event_loop.exit(),
-            _ => {}
+    pub fn handle_key(&mut self, event_loop: &ActiveEventLoop, key: KeyCode, pressed: bool) {
+        if key == KeyCode::Escape && pressed {
+            event_loop.exit();
+        } else {
+            self.camera_controller.handle_key(key, pressed);
         }
     }
 
-    pub fn update(&mut self) {}
+    pub fn update(&mut self) {
+        self.camera_controller.update_camera(&mut self.camera);
+        self.camera_uniform.update_view_proj(&self.camera);
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::cast_slice(&[self.camera_uniform]),
+        );
+    }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         self.window.request_redraw();
