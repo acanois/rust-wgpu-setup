@@ -1,6 +1,7 @@
 pub mod app;
 pub mod state;
 pub mod vertex;
+pub mod texture;
 
 use winit::event_loop::EventLoop;
 
