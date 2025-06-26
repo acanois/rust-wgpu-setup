@@ -4,6 +4,8 @@ pub mod vertex;
 pub mod texture;
 pub mod camera;
 pub mod instance;
+pub mod model;
+pub mod resources;
 
 use winit::event_loop::EventLoop;
 
