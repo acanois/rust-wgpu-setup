@@ -2,9 +2,11 @@ use std::sync::Arc;
 
 use winit::{event_loop::ActiveEventLoop, keyboard::KeyCode, window::Window};
 
+use cgmath::prelude::*;
 use wgpu::util::DeviceExt;
 
 use crate::camera;
+use crate::instance;
 use crate::texture;
 use crate::vertex;
 
@@ -33,6 +35,13 @@ const VERTICES: &[vertex::Vertex] = &[
 
 const INDICES: &[u16] = &[0, 1, 4, 1, 2, 4, 2, 3, 4];
 
+const NUM_INSTANCES_PER_ROW: u32 = 10;
+const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
+    NUM_INSTANCES_PER_ROW as f32 * 0.5,
+    0.0,
+    NUM_INSTANCES_PER_ROW as f32 * 0.5,
+);
+
 pub struct State {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
@@ -51,6 +60,8 @@ pub struct State {
     camera_uniform: camera::CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
+    instances: Vec<instance::Instance>,
+    instance_buffer: wgpu::Buffer,
 }
 
 impl State {
@@ -210,6 +221,42 @@ impl State {
 
         let camera_controller = camera::CameraController::new(0.2);
 
+        // Instances
+        let instances = (0..NUM_INSTANCES_PER_ROW)
+            .flat_map(|z| {
+                (0..NUM_INSTANCES_PER_ROW).map(move |x| {
+                    let position = cgmath::Vector3 {
+                        x: x as f32,
+                        y: 0.0,
+                        z: z as f32,
+                    } - INSTANCE_DISPLACEMENT;
+
+                    let rotation = if position.is_zero() {
+                        // this is needed so an object at (0, 0, 0) won't get scaled to zero
+                        // as Quaternions can affect scale if they're not created correctly
+                        cgmath::Quaternion::from_axis_angle(
+                            cgmath::Vector3::unit_z(),
+                            cgmath::Deg(0.0),
+                        )
+                    } else {
+                        cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
+                    };
+
+                    instance::Instance { position, rotation }
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let instance_data = instances
+            .iter()
+            .map(instance::Instance::to_raw)
+            .collect::<Vec<_>>();
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Instance Buffer"),
+            contents: bytemuck::cast_slice(&instance_data),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
         // Shader
         // Create shader - include_wgsl! is shorthand for:
         // let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -234,7 +281,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"), // vs_main = entry point inside shader.wgsl
-                buffers: &[vertex::Vertex::desc()], // buffers to pass to v-shader
+                buffers: &[vertex::Vertex::desc(), instance::InstanceRaw::desc()], // buffers to pass to v-shader
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -306,6 +353,8 @@ impl State {
             camera_buffer,
             camera_bind_group,
             camera_controller,
+            instances,
+            instance_buffer,
         })
     }
 
@@ -320,7 +369,7 @@ impl State {
             self.surface.configure(&self.device, &self.config);
             self.is_surface_configured = true;
 
-             self.camera.aspect = self.config.width as f32 / self.config.height as f32;
+            self.camera.aspect = self.config.width as f32 / self.config.height as f32;
         }
     }
 
@@ -393,10 +442,13 @@ impl State {
 
             // Set vertex buffer and index buffer
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
             // Draw indices
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+            // render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+            // Casting "x as _" causes the compiler to infer the type from context
+            render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
         }
 
         // submit will accept anything that implements IntoIter
