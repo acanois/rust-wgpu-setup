@@ -3,6 +3,7 @@ name = "wgpu-template"
 version = "0.1.0"
 authors = ["David Richter <https://github.com/acanois>"]
 edition = "2018"
+build = "build.rs"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
