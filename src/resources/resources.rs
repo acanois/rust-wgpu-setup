@@ -56,9 +56,9 @@ pub async fn load_texture(
     file_name: &str,
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-) -> anyhow::Result<texture::Texture> {
+) -> anyhow::Result<texture::texture::Texture> {
     let data = load_binary(file_name).await?;
-    texture::Texture::from_bytes(device, queue, &data, file_name)
+    texture::texture::Texture::from_bytes(device, queue, &data, file_name)
 }
 
 pub async fn load_model(

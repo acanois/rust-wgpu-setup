@@ -36,7 +36,7 @@ pub struct State {
     instances: Vec<instance::instance::Instance>,
     #[allow(dead_code)]
     instance_buffer: wgpu::Buffer,
-    depth_texture: texture::Texture,
+    depth_texture: texture::texture::Texture,
     pub window: Arc<Window>,
 }
 
@@ -216,7 +216,7 @@ impl State {
         });
 
         let depth_texture =
-            texture::Texture::create_depth_texture(&device, &config, "depth_texture");
+            texture::texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -264,7 +264,7 @@ impl State {
                 conservative: false,
             },
             depth_stencil: Some(wgpu::DepthStencilState {
-                format: texture::Texture::DEPTH_FORMAT,
+                format: texture::texture::Texture::DEPTH_FORMAT,
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::Less,
                 stencil: wgpu::StencilState::default(),
@@ -313,7 +313,7 @@ impl State {
             self.surface.configure(&self.device, &self.config);
             self.is_surface_configured = true;
             self.depth_texture =
-                texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
+                texture::texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
 
             self.camera.aspect = self.config.width as f32 / self.config.height as f32;
         }
