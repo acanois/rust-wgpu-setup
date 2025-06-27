@@ -7,11 +7,11 @@ use cgmath::prelude::*;
 use wgpu::util::DeviceExt;
 
 use crate::camera;
-use crate::instance;
+use crate::instance::{instance::Instance, instance_raw::InstanceRaw};
+use crate::model;
 use crate::model::model::Vertex;
 use crate::resources;
 use crate::texture;
-use crate::model;
 
 use model::model::DrawModel;
 
@@ -31,7 +31,7 @@ pub struct State {
     camera_uniform: camera::camera_uniform::CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
-    instances: Vec<instance::instance::Instance>,
+    instances: Vec<Instance>,
     #[allow(dead_code)]
     instance_buffer: wgpu::Buffer,
     depth_texture: texture::texture::Texture,
@@ -163,14 +163,14 @@ impl State {
                         cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
                     };
 
-                    instance::instance::Instance { position, rotation }
+                    Instance { position, rotation }
                 })
             })
             .collect::<Vec<_>>();
 
         let instance_data = instances
             .iter()
-            .map(instance::instance::Instance::to_raw)
+            .map(Instance::to_raw)
             .collect::<Vec<_>>();
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance Buffer"),
@@ -203,10 +203,14 @@ impl State {
         });
 
         log::warn!("Load model");
-        let obj_model =
-            resources::resources::load_model("cube.obj", &device, &queue, &texture_bind_group_layout)
-                .await
-                .unwrap();
+        let obj_model = resources::resources::load_model(
+            "cube.obj",
+            &device,
+            &queue,
+            &texture_bind_group_layout,
+        )
+        .await
+        .unwrap();
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("shader.wgsl"),
@@ -231,7 +235,7 @@ impl State {
                 entry_point: Some("vs_main"),
                 buffers: &[
                     model::model::ModelVertex::desc(),
-                    instance::instance::InstanceRaw::desc(),
+                    InstanceRaw::desc(),
                 ],
                 compilation_options: Default::default(),
             },
@@ -310,8 +314,11 @@ impl State {
             self.config.height = height;
             self.surface.configure(&self.device, &self.config);
             self.is_surface_configured = true;
-            self.depth_texture =
-                texture::texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
+            self.depth_texture = texture::texture::Texture::create_depth_texture(
+                &self.device,
+                &self.config,
+                "depth_texture",
+            );
 
             self.camera.aspect = self.config.width as f32 / self.config.height as f32;
         }
