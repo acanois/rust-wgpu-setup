@@ -1,11 +1,11 @@
-pub mod app;
-pub mod state;
-pub mod vertex;
-pub mod texture;
-pub mod camera;
-pub mod instance;
-pub mod model;
-pub mod resources;
+mod app;
+mod state;
+mod vertex;
+mod texture;
+mod camera;
+mod instance;
+mod model;
+mod resources;
 
 use winit::event_loop::EventLoop;
 

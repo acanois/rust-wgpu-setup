@@ -9,10 +9,8 @@ use wgpu::util::DeviceExt;
 use crate::camera;
 use crate::instance;
 use crate::model::model::Vertex;
-// use crate::model::Vertex;
 use crate::resources;
 use crate::texture;
-// use crate::vertex;
 use crate::model;
 
 use model::model::DrawModel;
@@ -29,8 +27,8 @@ pub struct State {
     render_pipeline: wgpu::RenderPipeline,
     obj_model: model::model::Model,
     camera: camera::camera::Camera,
-    camera_controller: camera::camera::CameraController,
-    camera_uniform: camera::camera::CameraUniform,
+    camera_controller: camera::camera_controller::CameraController,
+    camera_uniform: camera::camera_uniform::CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     instances: Vec<instance::instance::Instance>,
@@ -137,9 +135,9 @@ impl State {
             znear: 0.1,
             zfar: 100.0,
         };
-        let camera_controller = camera::camera::CameraController::new(0.2);
+        let camera_controller = camera::camera_controller::CameraController::new(0.2);
 
-        let mut camera_uniform = camera::camera::CameraUniform::new();
+        let mut camera_uniform = camera::camera_uniform::CameraUniform::new();
         camera_uniform.update_view_proj(&camera);
 
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
