@@ -8,12 +8,10 @@ use wgpu::util::DeviceExt;
 
 use crate::camera;
 use crate::instance::{instance::Instance, instance_raw::InstanceRaw};
-use crate::model;
-use crate::model::model::Vertex;
+use crate::model::model::{Model, DrawModel, Vertex};
+use crate::model::model_vertex::ModelVertex;
 use crate::resources;
 use crate::texture;
-
-use model::model::DrawModel;
 
 const NUM_INSTANCES_PER_ROW: u32 = 10;
 const SPACE_BETWEEN: f32 = 3.0;
@@ -25,7 +23,7 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     is_surface_configured: bool,
     render_pipeline: wgpu::RenderPipeline,
-    obj_model: model::model::Model,
+    obj_model: Model,
     camera: camera::camera::Camera,
     camera_controller: camera::camera_controller::CameraController,
     camera_uniform: camera::camera_uniform::CameraUniform,
@@ -168,10 +166,7 @@ impl State {
             })
             .collect::<Vec<_>>();
 
-        let instance_data = instances
-            .iter()
-            .map(Instance::to_raw)
-            .collect::<Vec<_>>();
+        let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance Buffer"),
             contents: bytemuck::cast_slice(&instance_data),
@@ -233,10 +228,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[
-                    model::model::ModelVertex::desc(),
-                    InstanceRaw::desc(),
-                ],
+                buffers: &[ModelVertex::desc(), InstanceRaw::desc()],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {

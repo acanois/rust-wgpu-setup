@@ -4,7 +4,10 @@ use std::io::{BufReader, Cursor};
 
 use wgpu::util::DeviceExt;
 
-use crate::{model, texture};
+use crate::{
+    model::{mesh::Mesh, model::Model, model_vertex::ModelVertex},
+    texture::texture,
+};
 
 #[cfg(target_arch = "wasm32")]
 fn format_url(file_name: &str) -> reqwest::Url {
@@ -56,9 +59,9 @@ pub async fn load_texture(
     file_name: &str,
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-) -> anyhow::Result<texture::texture::Texture> {
+) -> anyhow::Result<texture::Texture> {
     let data = load_binary(file_name).await?;
-    texture::texture::Texture::from_bytes(device, queue, &data, file_name)
+    texture::Texture::from_bytes(device, queue, &data, file_name)
 }
 
 pub async fn load_model(
@@ -66,7 +69,7 @@ pub async fn load_model(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     layout: &wgpu::BindGroupLayout,
-) -> anyhow::Result<model::model::Model> {
+) -> anyhow::Result<Model> {
     let obj_text = load_string(file_name).await?;
     let obj_cursor = Cursor::new(obj_text);
     let mut obj_reader = BufReader::new(obj_cursor);
@@ -103,7 +106,7 @@ pub async fn load_model(
             label: None,
         });
 
-        materials.push(model::model::Material {
+        materials.push(crate::model::material::Material {
             name: m.name,
             diffuse_texture,
             bind_group,
@@ -113,26 +116,32 @@ pub async fn load_model(
     let meshes = models
         .into_iter()
         .map(|m| {
-                let vertices = (0..m.mesh.positions.len() / 3)
+            let vertices = (0..m.mesh.positions.len() / 3)
                 .map(|i| {
-                    if m.mesh.normals.is_empty(){
-                        model::model::ModelVertex {
+                    if m.mesh.normals.is_empty() {
+                        ModelVertex {
                             position: [
                                 m.mesh.positions[i * 3],
                                 m.mesh.positions[i * 3 + 1],
                                 m.mesh.positions[i * 3 + 2],
                             ],
-                            tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
+                            tex_coords: [
+                                m.mesh.texcoords[i * 2],
+                                1.0 - m.mesh.texcoords[i * 2 + 1],
+                            ],
                             normal: [0.0, 0.0, 0.0],
                         }
-                    }else{
-                        model::model::ModelVertex {
+                    } else {
+                        ModelVertex {
                             position: [
                                 m.mesh.positions[i * 3],
                                 m.mesh.positions[i * 3 + 1],
                                 m.mesh.positions[i * 3 + 2],
                             ],
-                            tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
+                            tex_coords: [
+                                m.mesh.texcoords[i * 2],
+                                1.0 - m.mesh.texcoords[i * 2 + 1],
+                            ],
                             normal: [
                                 m.mesh.normals[i * 3],
                                 m.mesh.normals[i * 3 + 1],
@@ -154,7 +163,7 @@ pub async fn load_model(
                 usage: wgpu::BufferUsages::INDEX,
             });
 
-            model::model::Mesh {
+            Mesh {
                 name: file_name.to_string(),
                 vertex_buffer,
                 index_buffer,
@@ -164,7 +173,5 @@ pub async fn load_model(
         })
         .collect::<Vec<_>>();
 
-    Ok(model::model::Model { meshes, materials })
+    Ok(Model { meshes, materials })
 }
-
-
