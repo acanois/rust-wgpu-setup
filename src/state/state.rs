@@ -6,15 +6,14 @@ use winit::{event_loop::ActiveEventLoop, keyboard::KeyCode, window::Window};
 use cgmath::prelude::*;
 use wgpu::util::DeviceExt;
 
-use crate::camera;
+use crate::camera::{
+    camera::Camera, camera_controller::CameraController, camera_uniform::CameraUniform,
+};
 use crate::instance::{instance::Instance, instance_raw::InstanceRaw};
 use crate::model::model::{DrawModel, Model, Vertex};
 use crate::model::model_vertex::ModelVertex;
 use crate::resources;
 use crate::texture;
-
-const NUM_INSTANCES_PER_ROW: u32 = 10;
-const SPACE_BETWEEN: f32 = 3.0;
 
 pub struct State {
     surface: wgpu::Surface<'static>,
@@ -24,9 +23,9 @@ pub struct State {
     is_surface_configured: bool,
     render_pipeline: wgpu::RenderPipeline,
     obj_model: Model,
-    camera: camera::camera::Camera,
-    camera_controller: camera::camera_controller::CameraController,
-    camera_uniform: camera::camera_uniform::CameraUniform,
+    camera: Camera,
+    camera_controller: CameraController,
+    camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     instances: Vec<Instance>,
@@ -112,7 +111,7 @@ impl State {
             ..Default::default()
         });
 
-        let surface = instance.create_surface(window.clone()).unwrap();
+        let surface = instance.create_surface(window.clone())?;
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -220,13 +219,13 @@ impl State {
         config: &wgpu::SurfaceConfiguration,
         camera_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> (
-        camera::camera::Camera,
-        camera::camera_controller::CameraController,
-        camera::camera_uniform::CameraUniform,
+        Camera,
+        CameraController,
+        CameraUniform,
         wgpu::Buffer,
         wgpu::BindGroup,
     ) {
-        let camera = camera::camera::Camera {
+        let camera = Camera {
             eye: (0.0, 5.0, -10.0).into(),
             target: (0.0, 0.0, 0.0).into(),
             up: cgmath::Vector3::unit_y(),
@@ -236,9 +235,9 @@ impl State {
             zfar: 100.0,
         };
 
-        let camera_controller = camera::camera_controller::CameraController::new(0.2);
+        let camera_controller = CameraController::new(0.2);
 
-        let mut camera_uniform = camera::camera_uniform::CameraUniform::new();
+        let mut camera_uniform = CameraUniform::new();
         camera_uniform.update_view_proj(&camera);
 
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -266,6 +265,9 @@ impl State {
     }
 
     fn setup_instances(device: &wgpu::Device) -> (Vec<Instance>, wgpu::Buffer) {
+        const NUM_INSTANCES_PER_ROW: u32 = 10;
+        const SPACE_BETWEEN: f32 = 3.0;
+
         let instances = (0..NUM_INSTANCES_PER_ROW)
             .flat_map(|z| {
                 (0..NUM_INSTANCES_PER_ROW).map(move |x| {
