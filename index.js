@@ -1,2 +1,2 @@
-const init = await import('./pkg/game.js');
+const init = await import('./pkg/wgpu_template.js');
 init().then(() => console.log("WASM Loaded"));
