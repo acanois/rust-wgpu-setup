@@ -112,7 +112,7 @@ impl State {
         log::info!("OSC Thread started");
 
         let address = "127.0.0.1:7000"; // Why does to_string dereference this?
-        let mut socket = match std::net::UdpSocket::bind(address) {
+        let socket = match std::net::UdpSocket::bind(address) {
             Ok(socket) => socket,
             Err(error) => {
                 log::error!("Could not bind UDP socket for OSC: {}", error);
