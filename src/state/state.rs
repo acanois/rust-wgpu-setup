@@ -1,5 +1,11 @@
 use std::iter;
-use std::sync::Arc;
+use std::sync::mpsc;
+use std::sync::Arc; // For OSC
+
+use rosc::OscPacket;
+use std::env;
+use std::net::{SocketAddrV4, UdpSocket};
+use std::str::FromStr;
 
 use winit::{event_loop::ActiveEventLoop, keyboard::KeyCode, window::Window};
 
@@ -14,6 +20,11 @@ use crate::model::model::{DrawModel, Model, Vertex};
 use crate::model::model_vertex::ModelVertex;
 use crate::resources;
 use crate::texture;
+
+// OSC
+pub enum OscCommand {
+    SetHeight(f32),
+}
 
 pub struct State {
     surface: wgpu::Surface<'static>,
@@ -33,11 +44,15 @@ pub struct State {
     instance_buffer: wgpu::Buffer,
     depth_texture: texture::texture::Texture,
     pub window: Arc<Window>,
+    osc_receiver: mpsc::Receiver<OscCommand>,
 }
 
 impl State {
     pub async fn new(window: Arc<Window>) -> anyhow::Result<State> {
         let size = window.inner_size();
+
+        // Initialize OSC
+        let (osc_sender, osc_receiver) = mpsc::channel::<OscCommand>();
 
         // Initialize
         let (instance, surface, adapter, device, queue) =
@@ -69,6 +84,9 @@ impl State {
             &camera_bind_group_layout,
         );
 
+        // OSC Thread
+        std::thread::spawn(move || Self::osc_thread_main(osc_sender));
+
         Ok(Self {
             surface,
             device,
@@ -86,7 +104,48 @@ impl State {
             instance_buffer,
             depth_texture,
             window,
+            osc_receiver,
         })
+    }
+
+    fn osc_thread_main(osc_sender: mpsc::Sender<OscCommand>) {
+        log::info!("OSC Thread started");
+
+        let address = "127.0.0.1:7000"; // Why does to_string dereference this?
+        let mut socket = match std::net::UdpSocket::bind(address) {
+            Ok(socket) => socket,
+            Err(error) => {
+                log::error!("Could not bind UDP socket for OSC: {}", error);
+                return;
+            }
+        };
+
+        log::info!("Listening on {}", address);
+
+        let mut buf = [0u8; rosc::decoder::MTU];
+
+        loop {
+            match socket.recv_from(&mut buf) {
+                Ok((size, addr)) => {
+                    println!("Received packet with size {} from: {}", size, addr);
+                    let (_, packet) = rosc::decoder::decode_udp(&buf[..size]).unwrap();
+                    match packet {
+                        OscPacket::Message(msg) => {
+                            println!("OSC address: {}", msg.addr);
+                            println!("OSC arguments: {:?}", msg.args);
+                        }
+                        OscPacket::Bundle(bundle) => {
+                            println!("OSC Bundle: {:?}", bundle);
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("Error receiving from socket: {}", e);
+                    break;
+                }
+            }
+        }
+        log::info!("OSC Thread finished");
     }
 
     // Initialize WGPU

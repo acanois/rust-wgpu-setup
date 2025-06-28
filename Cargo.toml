@@ -18,6 +18,7 @@ pollster = "0.3"
 bytemuck = { version = "1.16", features = ["derive"] }
 cgmath = "0.18"
 tobj = { version = "3.2", default-features = false, features = ["async"]}
+rosc = "0.11.4"
 
 [dependencies.image]
 version = "0.24"
