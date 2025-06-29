@@ -5,6 +5,7 @@ mod camera;
 mod instance;
 mod model;
 mod resources;
+mod osc;
 
 use winit::event_loop::EventLoop;
 

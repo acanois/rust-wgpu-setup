@@ -18,13 +18,9 @@ use crate::camera::{
 use crate::instance::{instance::Instance, instance_raw::InstanceRaw};
 use crate::model::model::{DrawModel, Model, Vertex};
 use crate::model::model_vertex::ModelVertex;
-use crate::resources;
+use crate::{osc, resources};
+use crate::osc::receiver::OscCommand;
 use crate::texture;
-
-// OSC
-pub enum OscCommand {
-    SetHeight(f32),
-}
 
 pub struct State {
     surface: wgpu::Surface<'static>,
@@ -85,7 +81,7 @@ impl State {
         );
 
         // OSC Thread
-        std::thread::spawn(move || Self::osc_thread_main(osc_sender));
+        std::thread::spawn(move || osc::receiver::osc_thread_main(osc_sender));
 
         Ok(Self {
             surface,
@@ -106,46 +102,6 @@ impl State {
             window,
             osc_receiver,
         })
-    }
-
-    fn osc_thread_main(osc_sender: mpsc::Sender<OscCommand>) {
-        log::info!("OSC Thread started");
-
-        let address = "127.0.0.1:7000"; // Why does to_string dereference this?
-        let socket = match std::net::UdpSocket::bind(address) {
-            Ok(socket) => socket,
-            Err(error) => {
-                log::error!("Could not bind UDP socket for OSC: {}", error);
-                return;
-            }
-        };
-
-        log::info!("Listening on {}", address);
-
-        let mut buf = [0u8; rosc::decoder::MTU];
-
-        loop {
-            match socket.recv_from(&mut buf) {
-                Ok((size, addr)) => {
-                    println!("Received packet with size {} from: {}", size, addr);
-                    let (_, packet) = rosc::decoder::decode_udp(&buf[..size]).unwrap();
-                    match packet {
-                        OscPacket::Message(msg) => {
-                            println!("OSC address: {}", msg.addr);
-                            println!("OSC arguments: {:?}", msg.args);
-                        }
-                        OscPacket::Bundle(bundle) => {
-                            println!("OSC Bundle: {:?}", bundle);
-                        }
-                    }
-                }
-                Err(e) => {
-                    println!("Error receiving from socket: {}", e);
-                    break;
-                }
-            }
-        }
-        log::info!("OSC Thread finished");
     }
 
     // Initialize WGPU
